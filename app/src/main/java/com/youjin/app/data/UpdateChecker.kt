@@ -28,8 +28,8 @@ import java.net.URL
  * - 服务器需为 HTTPS（Android 9+ 默认禁止明文 HTTP）
  */
 object UpdateConfig {
-    /** 填入你的 manifest 地址即启用检查更新；留空则设置页显示“未启用” */
-    const val MANIFEST_URL = ""
+    /** manifest 地址：由 GitHub Pages 托管（仓库 docs/latest.json） */
+    const val MANIFEST_URL = "https://zykkkl.github.io/youjin/latest.json"
 }
 
 data class UpdateInfo(
