@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 启动图标前景：极简进度柱状图，白色描边，仅用透明度区分主次 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M22,78 L86,78"
+        android:strokeColor="#66FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M33,78 L33,52"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M54,78 L54,30"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M75,78 L75,58"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9"
+        android:strokeAlpha="0.55"
+        android:strokeLineCap="round" />
+</vector>

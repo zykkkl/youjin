@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Apple 灰页面底色（与 Compose 主题 background 保持一致） -->
+    <color name="app_background">#F5F5F7</color>
+    <!-- 自适应图标底色：Apple 蓝 -->
+    <color name="ic_launcher_background">#0071E3</color>
+</resources>

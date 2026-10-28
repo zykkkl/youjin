@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose 应用，使用平台 Material 主题作为窗口基底。
+         窗口底色与 Apple 灰背景一致，避免冷启动白/黑闪屏。 -->
+    <style name="Theme.Youjin" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/app_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>
