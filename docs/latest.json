@@ -1,6 +1,6 @@
 {
-  "versionCode": 8,
-  "versionName": "0.2.1",
-  "apkUrl": "https://github.com/zykkkl/youjin/releases/download/v0.2.1/youjin-0.2.1.apk",
-  "notes": "修复部分设备上「去下载」打不开链接的问题：改为应用内下载并在完成后拉起系统安装器，不再依赖浏览器。首次安装请允许「有进」安装未知应用。"
+  "versionCode": 9,
+  "versionName": "0.2.2",
+  "apkUrl": "https://github.com/zykkkl/youjin/releases/download/v0.2.2/youjin-0.2.2.apk",
+  "notes": "修复部分 OpenAI 兼容服务（如 MiniMax）在目标拆解时返回空内容的问题：兼容推理模型与不支持 system 角色的服务，输出被截断时自动重试，并显示服务端返回的真实原因。"
 }

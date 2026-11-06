@@ -16,6 +16,12 @@ import javax.net.ssl.SSLException
  *
  * 只用 HttpURLConnection + org.json，不引入额外网络库：请求体与响应结构都很小，
  * 不做流式，超时、HTTP 状态码与网络异常统一转成可读文案。
+ *
+ * 兼容性兜底（各家的「兼容」并不完全一致）：
+ * - 响应里没有 choices[0].message.content 时，再尝试 choices[0].text 与 MiniMax 旧版
+ *   choices[0].messages[0].text 两种结构；
+ * - 有些服务不支持 system 角色，空响应时把 system 合并进首条 user 重试一次；
+ * - 推理模型可能把输出预算全用在推理上（finish_reason=length），此时放宽预算重试一次。
  */
 class AiClient {
 
@@ -31,39 +37,30 @@ class AiClient {
             return@withContext AiResult.Failure("请先填写接口地址与模型名")
         }
         try {
-            val body = JSONObject().apply {
-                put("model", config.model.trim())
-                put(
-                    "messages",
-                    JSONArray().apply {
-                        messages.forEach { message ->
-                            put(JSONObject().put("role", message.role).put("content", message.content))
-                        }
-                    },
-                )
-                put("temperature", temperature)
-                put("max_tokens", maxTokens)
-                put("stream", false)
-            }.toString()
-
-            val text = request(
-                method = "POST",
-                url = AiProviders.chatEndpoint(config.baseUrl),
-                body = body,
-                apiKey = config.apiKey,
-            )
-            val json = JSONObject(text)
-            val content = json.optJSONArray("choices")
-                ?.optJSONObject(0)
-                ?.optJSONObject("message")
-                ?.optString("content")
-                ?.trim()
-            if (content.isNullOrBlank()) {
-                val error = json.optJSONObject("error")?.optString("message").orEmpty()
-                AiResult.Failure(if (error.isNotBlank()) error else "服务返回了空内容，请检查模型名或稍后重试")
-            } else {
-                AiResult.Ok(content)
+            val first = post(config, messages, maxTokens, temperature)
+            AiResponse.content(first)?.let { return@withContext AiResult.Ok(it) }
+            AiResponse.providerError(first)?.let {
+                return@withContext AiResult.Failure("AI 服务返回错误：$it")
             }
+
+            val retryMessages =
+                if (messages.any { it.role.equals("system", ignoreCase = true) }) {
+                    mergeSystem(messages)
+                } else {
+                    messages
+                }
+            val retryTokens =
+                if (AiResponse.finishReason(first) == "length") {
+                    (maxTokens * 2).coerceAtMost(3000)
+                } else {
+                    maxTokens
+                }
+            val second = post(config, retryMessages, retryTokens, temperature)
+            AiResponse.content(second)?.let { return@withContext AiResult.Ok(it) }
+            AiResponse.providerError(second)?.let {
+                return@withContext AiResult.Failure("AI 服务返回错误：$it")
+            }
+            AiResult.Failure(AiResponse.emptyMessage(second))
         } catch (e: Exception) {
             AiResult.Failure(friendlyError(e))
         }
@@ -98,6 +95,54 @@ class AiClient {
         }
     }
 
+    private fun post(
+        config: AiConfig,
+        messages: List<Message>,
+        maxTokens: Int,
+        temperature: Double,
+    ): JSONObject {
+        val body = JSONObject().apply {
+            put("model", config.model.trim())
+            put(
+                "messages",
+                JSONArray().apply {
+                    messages.forEach { message ->
+                        put(JSONObject().put("role", message.role).put("content", message.content))
+                    }
+                },
+            )
+            put("temperature", temperature)
+            put("max_tokens", maxTokens)
+            put("stream", false)
+        }.toString()
+        return JSONObject(
+            request(
+                method = "POST",
+                url = AiProviders.chatEndpoint(config.baseUrl),
+                body = body,
+                apiKey = config.apiKey,
+            ),
+        )
+    }
+
+    /** 把 system 消息并入首条 user，供不支持 system 角色的兼容实现重试。 */
+    private fun mergeSystem(messages: List<Message>): List<Message> {
+        val system = messages
+            .filter { it.role.equals("system", ignoreCase = true) }
+            .joinToString("\n\n") { it.content }
+        if (system.isBlank()) return messages
+        val rest = messages
+            .filterNot { it.role.equals("system", ignoreCase = true) }
+            .toMutableList()
+        val firstUser = rest.indexOfFirst { it.role.equals("user", ignoreCase = true) }
+        if (firstUser >= 0) {
+            rest[firstUser] = Message("user", "$system\n\n${rest[firstUser].content}")
+        } else {
+            rest.add(0, Message("user", system))
+        }
+        return rest
+    }
+
     private class HttpStatusException(val code: Int, val body: String) : Exception("HTTP $code")
 
     private fun request(method: String, url: String, body: String?, apiKey: String): String {
@@ -128,7 +173,10 @@ class AiClient {
     private fun friendlyError(error: Throwable): String = when (error) {
         is HttpStatusException -> {
             val detail = runCatching {
-                JSONObject(error.body).optJSONObject("error")?.optString("message").orEmpty()
+                val json = JSONObject(error.body)
+                json.optJSONObject("error")?.optString("message").orEmpty().ifBlank {
+                    json.optJSONObject("base_resp")?.optString("status_msg").orEmpty()
+                }
             }.getOrDefault("")
             when (error.code) {
                 401, 403 -> "API Key 无效或没有权限（HTTP ${error.code}）"
@@ -144,5 +192,82 @@ class AiClient {
         is ConnectException -> "无法连接到服务，请检查网络与地址"
         is SSLException -> "安全连接失败，请确认地址使用 HTTPS"
         else -> error.message?.takeIf { it.isNotBlank() } ?: "请求失败，请稍后再试"
+    }
+}
+
+/**
+ * 响应解析：把各家略有差异的返回结构收敛成「一段回答文本 + 失败原因」。
+ * 单独拆出来是为了能在单元测试里覆盖这些兼容分支。
+ */
+internal object AiResponse {
+
+    fun content(json: JSONObject): String? {
+        val choice = json.optJSONArray("choices")?.optJSONObject(0) ?: return null
+        choice.optJSONObject("message")?.let { message ->
+            textOf(message.opt("content"))?.takeIf { it.isNotBlank() }?.let { return it }
+        }
+        textOf(choice.opt("text"))?.takeIf { it.isNotBlank() }?.let { return it }
+        choice.optJSONArray("messages")?.optJSONObject(0)?.let { legacy ->
+            legacy.optString("text").trim().takeIf { it.isNotBlank() }?.let { return it }
+        }
+        return null
+    }
+
+    fun finishReason(json: JSONObject): String? = json.optJSONArray("choices")
+        ?.optJSONObject(0)
+        ?.optString("finish_reason")
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
+
+    fun providerError(json: JSONObject): String? {
+        json.optJSONObject("error")?.let { error ->
+            val message = error.optString("message").trim()
+            if (message.isNotBlank()) return message
+        }
+        json.optJSONObject("base_resp")?.let { base ->
+            val code = base.optInt("status_code", 0)
+            if (code != 0) {
+                return base.optString("status_msg").trim().ifBlank { "status_code=$code" }
+            }
+        }
+        return null
+    }
+
+    fun hasReasoningOnly(json: JSONObject): Boolean {
+        val message = json.optJSONArray("choices")
+            ?.optJSONObject(0)
+            ?.optJSONObject("message")
+            ?: return false
+        return textOf(message.opt("reasoning_content"))?.isNotBlank() == true
+    }
+
+    fun emptyMessage(json: JSONObject): String {
+        val reason = finishReason(json)
+        return when {
+            hasReasoningOnly(json) ->
+                "模型这次只返回了推理内容，没有给出回答（finish_reason=${reason ?: "无"}）。请换用非推理模型再试。"
+            reason == "length" ->
+                "模型输出被截断且没有正文（finish_reason=length）。请重试，或换一个模型。"
+            else -> {
+                val snippet = json.toString().take(160)
+                "服务返回了空内容（finish_reason=${reason ?: "无"}）。响应片段：$snippet"
+            }
+        }
+    }
+
+    private fun textOf(value: Any?): String? = when (value) {
+        is String -> value.trim()
+        is JSONArray -> {
+            val parts = buildList {
+                for (index in 0 until value.length()) {
+                    val part = value.optJSONObject(index) ?: continue
+                    val text = part.optString("text").trim()
+                    if (text.isNotEmpty()) add(text)
+                }
+            }
+            if (parts.isEmpty()) null else parts.joinToString("\n")
+        }
+
+        else -> null
     }
 }

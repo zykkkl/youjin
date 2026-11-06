@@ -36,7 +36,7 @@ class AiFeatures(
                 AiClient.Message("system", AiPrompts.decomposeSystem()),
                 AiClient.Message("user", AiPrompts.decomposeUser(request, Dates.todayEpochDay())),
             ),
-            maxTokens = 900,
+            maxTokens = 1400,
             temperature = 0.5,
         )
         return when (result) {
@@ -66,7 +66,7 @@ class AiFeatures(
                 AiClient.Message("system", AiPrompts.reviewSystem()),
                 AiClient.Message("user", AiPrompts.reviewUser(weekStart, stats, existingNote)),
             ),
-            maxTokens = 600,
+            maxTokens = 900,
             temperature = 0.5,
         )
     }
