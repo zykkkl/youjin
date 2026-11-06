@@ -1,6 +1,9 @@
 package com.youjin.app.ui.settings
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -29,10 +32,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.youjin.app.data.ThemeMode
+import com.youjin.app.data.UpdateDownloader
+import com.youjin.app.data.UpdateInfo
 import com.youjin.app.data.UpdateScheduler
 import com.youjin.app.data.ai.AiProviders
 import com.youjin.app.ui.components.AppleDialog
@@ -48,7 +54,9 @@ import com.youjin.app.ui.components.Hairline
 import com.youjin.app.ui.components.LocalSnackbarHost
 import com.youjin.app.ui.theme.AppleTheme
 import com.youjin.app.util.Dates
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
 
 /** 设置页：主题、减少动效、通知权限、数据备份恢复与导出、AI 助手、关于 */
 @Composable
@@ -86,6 +94,80 @@ fun SettingsScreen(
         vm.messages.collect { message ->
             snackbar.showSnackbar(message)
         }
+    }
+
+    // 应用内下载更新：部分设备没有可打开 https 链接的应用，直接调浏览器会失败
+    var downloading by remember { mutableStateOf(false) }
+    var downloadPercent by remember { mutableStateOf(-1) }
+    var downloadedFile by remember { mutableStateOf<File?>(null) }
+    var showInstallDialog by remember { mutableStateOf(false) }
+
+    fun copyUpdateUrl(url: String) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("有进更新地址", url))
+        scope.launch { snackbar.showSnackbar("下载链接已复制，可粘贴到浏览器下载") }
+    }
+
+    fun installDownloaded(file: File) {
+        if (Build.VERSION.SDK_INT >= 26 && !context.packageManager.canRequestPackageInstalls()) {
+            runCatching {
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:${context.packageName}"),
+                    )
+                )
+            }
+            scope.launch { snackbar.showSnackbar("请先允许「有进」安装未知应用，再点一次安装") }
+            return
+        }
+        runCatching {
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file,
+            )
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/vnd.android.package-archive")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+            )
+        }.onFailure {
+            scope.launch { snackbar.showSnackbar("无法启动系统安装器，请手动打开应用目录中的 APK") }
+        }
+    }
+
+    fun startUpdateDownload(info: UpdateInfo) {
+        runCatching { UpdateDownloader.start(context, info) }
+            .onSuccess { id ->
+                downloading = true
+                downloadPercent = 0
+                scope.launch {
+                    while (true) {
+                        delay(800)
+                        val progress = UpdateDownloader.query(context, id) ?: break
+                        downloadPercent = progress.percent
+                        if (progress.done) {
+                            downloading = false
+                            downloadedFile = UpdateDownloader.fileFor(context, info)
+                            showInstallDialog = true
+                            break
+                        }
+                        if (progress.failed) {
+                            downloading = false
+                            copyUpdateUrl(info.apkUrl)
+                            break
+                        }
+                    }
+                }
+            }
+            .onFailure {
+                // DownloadManager 不可用时退回浏览器，仍不行就把链接复制到剪贴板
+                runCatching {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.apkUrl)))
+                }.onFailure { copyUpdateUrl(info.apkUrl) }
+            }
     }
 
     LaunchedEffect(updateState) {
@@ -321,6 +403,17 @@ fun SettingsScreen(
                         onClick = { vm.checkUpdate() },
                         showChevron = true,
                     )
+                    if (downloading) {
+                        Hairline(startIndent = 18.dp)
+                        AppleRow(
+                            title = "正在下载更新",
+                            subtitle = if (downloadPercent >= 0) {
+                                "已完成 $downloadPercent%"
+                            } else {
+                                "正在准备下载…"
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -343,20 +436,29 @@ fun SettingsScreen(
     (updateState as? UpdateUiState.Available)?.let { s ->
         AppleDialog(
             title = "发现新版本 v${s.info.versionName}",
-            message = s.info.notes.ifBlank { "包含常规改进与问题修复。" },
-            confirmLabel = "去下载",
-            dismissLabel = "稍后",
+            message = s.info.notes.ifBlank { "包含常规改进与问题修复。" } +
+                "\n\n将直接在本应用内下载，完成后提示安装。首次安装需允许「有进」安装未知应用。",
+            confirmLabel = if (downloading) "下载中…" else "下载并安装",
+            confirmEnabled = !downloading,
             onConfirm = {
                 vm.consumeUpdateState()
-                runCatching {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(s.info.apkUrl)))
-                }.onFailure {
-                    scope.launch {
-                        snackbar.showSnackbar("无法打开下载链接，请手动复制地址下载")
-                    }
-                }
+                startUpdateDownload(s.info)
             },
             onDismiss = { vm.consumeUpdateState() },
+        )
+    }
+
+    if (showInstallDialog) {
+        AppleDialog(
+            title = "更新已下载",
+            message = "安装包已保存到本机，点击「安装」打开系统安装器。覆盖安装会保留现有数据。",
+            confirmLabel = "安装",
+            dismissLabel = "稍后",
+            onConfirm = {
+                showInstallDialog = false
+                downloadedFile?.let { installDownloaded(it) }
+            },
+            onDismiss = { showInstallDialog = false },
         )
     }
 }

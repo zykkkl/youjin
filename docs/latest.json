@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "0.2.0",
-  "apkUrl": "https://github.com/zykkkl/youjin/releases/download/v0.2.0/youjin-0.2.0.apk",
-  "notes": "AI 助手（BYOK）：AI 拆解目标、AI 生成周复盘草稿；设置页新增 AI 助手，可配置 OpenAI / DeepSeek / MiniMax / Kimi / 智谱 / 通义 / SiliconFlow / OpenRouter / Ollama 或自定义接口。"
+  "versionCode": 8,
+  "versionName": "0.2.1",
+  "apkUrl": "https://github.com/zykkkl/youjin/releases/download/v0.2.1/youjin-0.2.1.apk",
+  "notes": "修复部分设备上「去下载」打不开链接的问题：改为应用内下载并在完成后拉起系统安装器，不再依赖浏览器。首次安装请允许「有进」安装未知应用。"
 }
