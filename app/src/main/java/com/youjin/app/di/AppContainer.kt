@@ -7,6 +7,9 @@ import com.youjin.app.data.GoalRepository
 import com.youjin.app.data.ReviewRepository
 import com.youjin.app.data.SettingsRepository
 import com.youjin.app.data.UpdateChecker
+import com.youjin.app.data.ai.AiClient
+import com.youjin.app.data.ai.AiFeatures
+import com.youjin.app.data.ai.AiSettingsRepository
 import com.youjin.app.data.reminder.ReminderScheduler
 
 /**
@@ -45,4 +48,10 @@ class AppContainer(private val app: Application) {
     val backupManager: BackupManager by lazy { BackupManager(app, database, reminderScheduler) }
 
     val updateChecker: UpdateChecker by lazy { UpdateChecker(app) }
+
+    val aiSettingsRepository: AiSettingsRepository by lazy { AiSettingsRepository(app) }
+
+    val aiClient: AiClient by lazy { AiClient() }
+
+    val aiFeatures: AiFeatures by lazy { AiFeatures(aiSettingsRepository, aiClient) }
 }

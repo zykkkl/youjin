@@ -8,6 +8,8 @@ import com.youjin.app.data.SettingsRepository
 import com.youjin.app.data.ThemeMode
 import com.youjin.app.data.UpdateChecker
 import com.youjin.app.data.UpdateInfo
+import com.youjin.app.data.ai.AiConfig
+import com.youjin.app.data.ai.AiSettingsRepository
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -33,6 +35,7 @@ class SettingsViewModel(
     private val settings: SettingsRepository,
     private val backup: BackupManager,
     private val updateChecker: UpdateChecker,
+    private val aiSettings: AiSettingsRepository,
 ) : ViewModel() {
 
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
@@ -44,6 +47,10 @@ class SettingsViewModel(
     /** 是否每天后台自动检查更新（默认开启） */
     val autoCheckUpdates: StateFlow<Boolean> = settings.autoCheckUpdates
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    /** AI 配置（只用于显示状态，编辑在 AI 设置页） */
+    val aiConfig: StateFlow<AiConfig> = aiSettings.config
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AiConfig())
 
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
     val messages: SharedFlow<String> = _messages.asSharedFlow()

@@ -39,6 +39,8 @@ import com.youjin.app.ui.goals.GoalsScreen
 import com.youjin.app.ui.goals.GoalsViewModel
 import com.youjin.app.ui.review.ReviewScreen
 import com.youjin.app.ui.review.ReviewViewModel
+import com.youjin.app.ui.settings.AiSettingsScreen
+import com.youjin.app.ui.settings.AiSettingsViewModel
 import com.youjin.app.ui.settings.SettingsScreen
 import com.youjin.app.ui.settings.SettingsViewModel
 import com.youjin.app.ui.theme.AppleTheme
@@ -51,6 +53,7 @@ sealed interface Route {
     data object Goals : Route
     data object Review : Route
     data object Settings : Route
+    data object AiSettings : Route
     data class GoalDetail(val goalId: Long) : Route
     data class GoalEdit(val goalId: Long?, val navId: Long) : Route
 }
@@ -180,7 +183,7 @@ fun YoujinRoot(
                     is Route.Review -> {
                         val vm: ReviewViewModel = viewModel(
                             factory = viewModelFactory {
-                                initializer { ReviewViewModel(container.reviewRepository) }
+                                initializer { ReviewViewModel(container.reviewRepository, container.aiFeatures) }
                             }
                         )
                         ReviewScreen(vm)
@@ -194,11 +197,30 @@ fun YoujinRoot(
                                         container.settingsRepository,
                                         container.backupManager,
                                         container.updateChecker,
+                                        container.aiSettingsRepository,
                                     )
                                 }
                             }
                         )
-                        SettingsScreen(vm = vm, onBack = ::pop)
+                        SettingsScreen(
+                            vm = vm,
+                            onBack = ::pop,
+                            onOpenAiSettings = { navigate(Route.AiSettings) },
+                        )
+                    }
+
+                    is Route.AiSettings -> {
+                        val vm: AiSettingsViewModel = viewModel(
+                            factory = viewModelFactory {
+                                initializer {
+                                    AiSettingsViewModel(
+                                        container.aiSettingsRepository,
+                                        container.aiFeatures,
+                                    )
+                                }
+                            }
+                        )
+                        AiSettingsScreen(vm = vm, onBack = ::pop)
                     }
 
                     is Route.GoalDetail -> {
@@ -223,7 +245,13 @@ fun YoujinRoot(
                         val vm: GoalEditViewModel = viewModel(
                             key = "edit-$navId",
                             factory = viewModelFactory {
-                                initializer { GoalEditViewModel(goalId, container.goalRepository) }
+                                initializer {
+                                    GoalEditViewModel(
+                                        goalId = goalId,
+                                        repo = container.goalRepository,
+                                        features = container.aiFeatures,
+                                    )
+                                }
                             },
                         )
                         GoalEditScreen(

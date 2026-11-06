@@ -37,6 +37,7 @@ import com.youjin.app.ui.components.AppleGroup
 import com.youjin.app.ui.components.AppleIconButton
 import com.youjin.app.ui.components.AppleLargeTitle
 import com.youjin.app.ui.components.AppleSectionHeader
+import com.youjin.app.ui.components.AppleTextAction
 import com.youjin.app.ui.components.AppleTextField
 import com.youjin.app.ui.components.EmptyState
 import com.youjin.app.ui.components.Hairline
@@ -53,6 +54,8 @@ fun ReviewScreen(vm: ReviewViewModel) {
     val weekStart by vm.weekStart.collectAsStateWithLifecycle()
     val stats by vm.stats.collectAsStateWithLifecycle()
     val review by vm.review.collectAsStateWithLifecycle()
+    val generating by vm.generating.collectAsStateWithLifecycle()
+    val aiDraft by vm.aiDraft.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarHost.current
     val scope = rememberCoroutineScope()
     val colors = AppleTheme.colors
@@ -63,6 +66,16 @@ fun ReviewScreen(vm: ReviewViewModel) {
         if (loadedWeek != weekStart) {
             noteDraft = review?.body ?: ""
             loadedWeek = weekStart
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        vm.messages.collect { snackbar.showSnackbar(it) }
+    }
+    LaunchedEffect(aiDraft) {
+        aiDraft?.let { draft ->
+            noteDraft = draft.take(1000)
+            vm.consumeAiDraft()
         }
     }
 
@@ -140,6 +153,28 @@ fun ReviewScreen(vm: ReviewViewModel) {
                     AppleSectionHeader(
                         "回顾笔记",
                         Modifier.padding(top = 12.dp, bottom = 0.dp),
+                        trailing = {
+                            if (generating) {
+                                Text(
+                                    "生成中…",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colors.secondaryLabel,
+                                )
+                            } else {
+                                AppleTextAction(
+                                    text = "AI 生成",
+                                    onClick = { vm.generateReview(noteDraft) },
+                                )
+                            }
+                        },
+                    )
+                }
+                item {
+                    Text(
+                        "AI 只根据本周记录生成草稿，不会自动保存；你可以修改后再保存。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.tertiaryLabel,
+                        modifier = Modifier.padding(start = 4.dp),
                     )
                 }
                 item {

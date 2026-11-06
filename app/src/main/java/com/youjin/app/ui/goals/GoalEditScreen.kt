@@ -53,12 +53,15 @@ import com.youjin.app.domain.CATEGORIES
 import com.youjin.app.domain.GOAL_EMOJIS
 import com.youjin.app.domain.GoalType
 import com.youjin.app.domain.ReminderSpec
+import com.youjin.app.ui.components.AppleButton
+import com.youjin.app.ui.components.AppleCard
 import com.youjin.app.ui.components.AppleChip
 import com.youjin.app.ui.components.AppleDatePickerDialog
 import com.youjin.app.ui.components.AppleGroup
 import com.youjin.app.ui.components.AppleIconButton
 import com.youjin.app.ui.components.AppleNavBar
 import com.youjin.app.ui.components.AppleRow
+import com.youjin.app.ui.components.AppleSecondaryButton
 import com.youjin.app.ui.components.AppleSectionHeader
 import com.youjin.app.ui.components.AppleSegmented
 import com.youjin.app.ui.components.AppleSwitch
@@ -83,6 +86,7 @@ fun GoalEditScreen(
     onSaved: () -> Unit,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val suggest by vm.suggest.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarHost.current
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -305,6 +309,94 @@ fun GoalEditScreen(
                             text = "＋ 添加步骤",
                             onClick = { vm.setSteps(state.steps + "") },
                             modifier = Modifier.padding(start = 2.dp),
+                        )
+                    }
+                }
+
+                item {
+                    AppleSectionHeader(
+                        "AI 辅助（可选）",
+                        Modifier.padding(top = 10.dp, bottom = 0.dp),
+                    )
+                }
+                item {
+                    AppleGroup {
+                        AppleRow(
+                            title = "AI 帮我拆解目标",
+                            subtitle = if (state.type == GoalType.CHECKLIST) {
+                                "生成可勾选的步骤与下一步行动"
+                            } else {
+                                "生成下一步行动建议"
+                            },
+                            onClick = vm::requestSuggestion,
+                            showChevron = true,
+                        )
+                    }
+                }
+                if (suggest.loading) {
+                    item {
+                        Text(
+                            "正在生成建议…",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.secondaryLabel,
+                            modifier = Modifier.padding(start = 4.dp),
+                        )
+                    }
+                }
+                suggest.suggestion?.let { plan ->
+                    item {
+                        AppleCard(contentPadding = PaddingValues(18.dp)) {
+                            Text("AI 建议", style = MaterialTheme.typography.titleSmall)
+                            Spacer(Modifier.height(8.dp))
+                            if (state.type == GoalType.CHECKLIST && plan.steps.isNotEmpty()) {
+                                plan.steps.forEachIndexed { index, step ->
+                                    Row(Modifier.padding(vertical = 2.dp)) {
+                                        Text(
+                                            "${index + 1}.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = colors.tertiaryLabel,
+                                            modifier = Modifier.width(20.dp),
+                                        )
+                                        Text(step, style = MaterialTheme.typography.bodyMedium)
+                                    }
+                                }
+                            } else if (state.type == GoalType.CUMULATIVE) {
+                                Text(
+                                    "累计数值型只采纳「下一步行动」，步骤请用步骤清单型目标。",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colors.secondaryLabel,
+                                )
+                            }
+                            plan.nextAction?.let { next ->
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "下一步：$next",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                AppleButton(
+                                    text = "采纳",
+                                    onClick = vm::applySuggestion,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                AppleSecondaryButton(
+                                    text = "放弃",
+                                    onClick = vm::dismissSuggestion,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                    }
+                }
+                suggest.error?.let { error ->
+                    item {
+                        Text(
+                            error,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.red,
+                            modifier = Modifier.padding(start = 4.dp),
                         )
                     }
                 }

@@ -3,6 +3,10 @@ package com.youjin.app.ui.goals
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.youjin.app.data.GoalRepository
+import com.youjin.app.data.ai.AiFeatures
+import com.youjin.app.data.ai.AiResult
+import com.youjin.app.data.ai.DecomposeRequest
+import com.youjin.app.data.ai.PlanSuggestion
 import com.youjin.app.domain.GoalDraft
 import com.youjin.app.domain.GoalType
 import com.youjin.app.domain.ReminderSpec
@@ -52,15 +56,26 @@ data class GoalEditState(
         }
 }
 
+/** AI 拆解建议的界面状态（建议只是草稿，采纳后才写入表单） */
+data class GoalSuggestState(
+    val loading: Boolean = false,
+    val suggestion: PlanSuggestion? = null,
+    val error: String? = null,
+)
+
 class GoalEditViewModel(
     private val goalId: Long?,
     private val repo: GoalRepository,
+    private val features: AiFeatures,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
         GoalEditState(isEdit = goalId != null, loading = goalId != null)
     )
     val state: StateFlow<GoalEditState> = _state.asStateFlow()
+
+    private val _suggest = MutableStateFlow(GoalSuggestState())
+    val suggest: StateFlow<GoalSuggestState> = _suggest.asStateFlow()
 
     init {
         if (goalId != null) {
@@ -117,6 +132,55 @@ class GoalEditViewModel(
 
     fun setSteps(list: List<String>) = _state.update { it.copy(steps = list) }
     fun setReminder(spec: ReminderSpec?) = _state.update { it.copy(reminder = spec) }
+
+    /** 请求 AI 拆解：只基于当前表单内容，不读取数据库 */
+    fun requestSuggestion() {
+        val s = _state.value
+        if (s.name.isBlank()) {
+            _suggest.value = GoalSuggestState(error = "请先填写目标名称")
+            return
+        }
+        if (_suggest.value.loading) return
+        _suggest.value = GoalSuggestState(loading = true)
+        viewModelScope.launch {
+            val result = features.decompose(
+                DecomposeRequest(
+                    name = s.name.trim(),
+                    type = s.type,
+                    unit = s.unit.trim(),
+                    targetValue = s.targetValue ?: 0.0,
+                    deadlineEpochDay = s.deadline,
+                    motivation = s.motivation,
+                )
+            )
+            _suggest.value = when (result) {
+                is AiResult.Ok -> GoalSuggestState(suggestion = result.data)
+                is AiResult.Failure -> GoalSuggestState(error = result.message)
+            }
+        }
+    }
+
+    /** 采纳建议：步骤只对清单型生效，下一步行动总是采用（AI 给的内容） */
+    fun applySuggestion() {
+        val plan = _suggest.value.suggestion ?: return
+        _state.update { s ->
+            val mergedSteps = if (s.type == GoalType.CHECKLIST) {
+                val existing = s.steps.map { it.trim() }.filter { it.isNotEmpty() }
+                (existing + plan.steps).distinct()
+            } else {
+                s.steps
+            }
+            s.copy(
+                steps = mergedSteps,
+                nextAction = plan.nextAction?.take(200) ?: s.nextAction,
+            )
+        }
+        _suggest.value = GoalSuggestState()
+    }
+
+    fun dismissSuggestion() {
+        _suggest.value = GoalSuggestState()
+    }
 
     /** 保存完成标记已被消费：避免复用旧 ViewModel 时立刻触发返回 */
     fun consumeSaved() {

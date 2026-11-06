@@ -27,8 +27,8 @@ android {
         applicationId = "com.youjin.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.1.5"
+        versionCode = 7
+        versionName = "0.2.0"
     }
 
     signingConfigs {
@@ -100,4 +100,6 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
 
     testImplementation(libs.junit)
+    // 单元测试里的 org.json 需要真实实现（Android 提供的是 stub）
+    testImplementation(libs.org.json)
 }

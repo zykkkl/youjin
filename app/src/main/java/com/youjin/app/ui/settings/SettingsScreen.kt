@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.youjin.app.data.ThemeMode
 import com.youjin.app.data.UpdateScheduler
+import com.youjin.app.data.ai.AiProviders
 import com.youjin.app.ui.components.AppleDialog
 import com.youjin.app.ui.components.AppleGroup
 import com.youjin.app.ui.components.AppleNavBar
@@ -49,16 +50,18 @@ import com.youjin.app.ui.theme.AppleTheme
 import com.youjin.app.util.Dates
 import kotlinx.coroutines.launch
 
-/** 设置页：主题、减少动效、通知权限、数据备份恢复与导出、关于 */
+/** 设置页：主题、减少动效、通知权限、数据备份恢复与导出、AI 助手、关于 */
 @Composable
 fun SettingsScreen(
     vm: SettingsViewModel,
     onBack: () -> Unit,
+    onOpenAiSettings: () -> Unit,
 ) {
     val themeMode by vm.themeMode.collectAsStateWithLifecycle()
     val reduceAnimations by vm.reduceAnimations.collectAsStateWithLifecycle()
     val updateState by vm.update.collectAsStateWithLifecycle()
     val autoCheckUpdates by vm.autoCheckUpdates.collectAsStateWithLifecycle()
+    val aiConfig by vm.aiConfig.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarHost.current
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -236,6 +239,32 @@ fun SettingsScreen(
             item {
                 Text(
                     "JSON 用于完整备份恢复，CSV 用于查看与分析。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.secondaryLabel,
+                    modifier = Modifier.padding(start = 4.dp, top = 12.dp),
+                )
+            }
+
+            item { AppleSectionHeader("AI 助手") }
+            item {
+                AppleGroup {
+                    AppleRow(
+                        title = "AI 助手",
+                        subtitle = when {
+                            aiConfig.ready -> "已启用 · ${AiProviders.displayNameOf(aiConfig.providerId)}" +
+                                if (aiConfig.model.isBlank()) "" else " · ${aiConfig.model}"
+
+                            aiConfig.enabled -> "已启用，但配置不完整"
+                            else -> "可选：协助拆解目标、生成每周复盘"
+                        },
+                        showChevron = true,
+                        onClick = onOpenAiSettings,
+                    )
+                }
+            }
+            item {
+                Text(
+                    "AI 为可选功能，需要你自己提供服务商的 API Key；关闭时应用完全不联网调用 AI。",
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.secondaryLabel,
                     modifier = Modifier.padding(start = 4.dp, top = 12.dp),

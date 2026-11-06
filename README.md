@@ -3,7 +3,7 @@
 > 把“我想做到”变成“我正在做到”。
 > 依据《目标进度APP产品方案_融合版.md》开发的首版实现。
 
-## 首版功能（v0.1）
+## 功能（v0.2）
 
 - 两类目标：累计数值型（如“跑步 60 公里”）、步骤清单型（如“完成个人网站”）
 - 目标生命周期：进行中 / 暂停 / 完成 / 归档，删除带撤销
@@ -13,6 +13,9 @@
 - 每日/指定星期提醒（WorkManager + 通知，Android 13+ 运行时权限引导）
 - JSON 全量备份与恢复（恢复前快照、事务替换）、CSV 记录导出（SAF 免存储权限）
 - 深色模式、减少动效、空状态与失败反馈、数据仅存本地（无需账号）
+- 长按目标或今日步骤：归档 / 删除（删除可撤销）
+- 检查更新：配置更新源后每日后台检查，发现新版本提示下载
+- AI 助手（可选，v0.2 新增）：AI 拆解目标、AI 生成周复盘草稿（见下）
 
 ## 技术栈
 
@@ -33,21 +36,35 @@ Room 2.7 · DataStore · WorkManager 2.10 · 最低 Android 8.0（API 26）
 
 设计令牌集中在 `ui/theme/Theme.kt`（`AppleTheme.colors`），基础组件位于 `ui/components/AppleUI.kt` 与 `ApplePickers.kt`。
 
+## AI 助手（可选，BYOK）
+
+设置 → AI 助手 中配置服务商、Base URL、模型与 API Key。默认不启用，关闭时应用不会主动调用任何 AI 接口。
+
+- 协议：只需 OpenAI 兼容的 `/chat/completions`（当前内置 OpenAI、DeepSeek、MiniMax、Kimi、智谱 GLM、通义千问、SiliconFlow、OpenRouter、Ollama、自定义模板）
+- BYOK：Key 由用户自备，用 Android Keystore 的 AES-GCM 加密后存本机 DataStore，不经过任何中转服务器
+- AI 拆解：新建/编辑目标页把建议填进表单，用户点「采纳」后才写入步骤与下一步行动
+- AI 复盘：回顾页生成草稿填进笔记框，不会自动保存
+- 本地 Ollama：Base URL 填电脑局域网 IP（如 `http://192.168.1.2:11434/v1`），模型填已拉取的模型名；为支持局域网 HTTP，Manifest 开启了 `usesCleartextTraffic`
+- 不做流式输出、不做自动打卡；AI 输出仅作为建议，记录数据始终由用户确认后写入
+
 ## 构建
 
 ```bat
 :: 首次使用前确认 local.properties 中 sdk.dir 指向本机 Android SDK
 gradlew.bat assembleDebug          :: 产物 app\build\outputs\apk\debug\app-debug.apk
-gradlew.bat testDebugUnitTest      :: 运行进度计算规则单元测试
+gradlew.bat testDebugUnitTest      :: 运行进度计算与 AI 解析单元测试
 ```
+
+若 `gradlew.bat` 因 wrapper 哈希目录不一致尝试重新下载发行版而失败，可直接用本机已解压的 Gradle 8.10.2：`gradle assembleDebug`。
 
 ## 目录结构
 
 ```
 app/src/main/java/com/youjin/app/
 ├── data/        Room 实体/DAO/数据库、仓库、备份管理、提醒调度
+├── data/ai/     AI 配置（Keystore 加密）、OpenAI 兼容客户端、提示词与解析
 ├── domain/      领域模型与进度计算规则（纯 Kotlin，可测试）
-├── ui/          Compose 界面：今天/目标/回顾/设置、通用组件
+├── ui/          Compose 界面：今天/目标/回顾/设置/AI 设置、通用组件
 └── util/        日期与格式化工具
 ```
 
