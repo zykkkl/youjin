@@ -265,7 +265,11 @@ fun GoalCard(
                 }
                 Spacer(Modifier.height(3.dp))
                 Text(
-                    goal.category ?: if (goal.type == GoalType.CUMULATIVE) "累计数值" else "步骤清单",
+                    goal.category ?: when (goal.type) {
+                        GoalType.CUMULATIVE -> "累计数值"
+                        GoalType.CHECKLIST -> "步骤清单"
+                        GoalType.CHECKIN -> "打卡坚持"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = p.secondaryLabel,
                 )
@@ -282,6 +286,8 @@ fun GoalCard(
                         "${formatNumber(goal.currentValue)} / ${formatNumber(goal.targetValue)} ${goal.unit}"
                     GoalType.CHECKLIST ->
                         "${goal.currentValue.toInt()} / ${goal.stepsTotal} 步骤"
+                    GoalType.CHECKIN ->
+                        "${goal.currentValue.toInt()} / ${goal.targetValue.toInt()} 天 · 连续 ${goal.checkinStreak} 天"
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = p.secondaryLabel,
@@ -342,7 +348,11 @@ fun GoalCard(
         if (onRecord != null) {
             Spacer(Modifier.height(16.dp))
             AppleSecondaryButton(
-                text = if (goal.type == GoalType.CUMULATIVE) "记录进展" else "勾选步骤",
+                text = when (goal.type) {
+                    GoalType.CUMULATIVE -> "记录进展"
+                    GoalType.CHECKLIST -> "勾选步骤"
+                    GoalType.CHECKIN -> if (goal.checkedToday()) "今日已打卡" else "打卡"
+                },
                 onClick = onRecord,
                 modifier = Modifier.width(132.dp),
                 height = 40.dp,

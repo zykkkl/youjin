@@ -45,6 +45,14 @@ class GoalDetailViewModel(
         viewModelScope.launch { repo.deleteEntry(entryId) }
     }
 
+    /** 打卡型目标：今天打卡一次 */
+    fun checkIn(onDone: (Long) -> Unit = {}) {
+        viewModelScope.launch {
+            val id = repo.checkIn(goalId)
+            onDone(id)
+        }
+    }
+
     fun toggleStep(stepId: Long, done: Boolean) {
         viewModelScope.launch { repo.toggleStep(stepId, done) }
     }

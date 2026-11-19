@@ -24,6 +24,8 @@ data class TodayUiState(
     val goalsById: Map<Long, Goal> = emptyMap(),
     /** 各目标的全部步骤（供首页步骤面板勾选） */
     val stepsByGoal: Map<Long, List<GoalStep>> = emptyMap(),
+    /** 今天已有记录的目标 → 记录 id（打卡撤销时用） */
+    val todayEntryByGoal: Map<Long, Long> = emptyMap(),
     val hasAnyGoal: Boolean = false,
     val hasActiveGoals: Boolean = false,
 )
@@ -71,6 +73,8 @@ class TodayViewModel(private val repo: GoalRepository) : ViewModel() {
                 records = records,
                 goalsById = goals.associateBy { it.id },
                 stepsByGoal = steps.groupBy { it.goalId },
+                todayEntryByGoal = entries.filter { it.occurDate == today }
+                    .associate { it.goalId to it.id },
                 hasAnyGoal = goals.isNotEmpty(),
                 hasActiveGoals = active.isNotEmpty(),
             )
@@ -109,6 +113,14 @@ class TodayViewModel(private val repo: GoalRepository) : ViewModel() {
     /** 步骤清单型目标的记录方式：勾选 / 取消勾选步骤 */
     fun toggleStep(stepId: Long, done: Boolean) {
         viewModelScope.launch { repo.toggleStep(stepId, done) }
+    }
+
+    /** 打卡型目标：今天打卡一次（重复打卡会被仓库拒绝） */
+    fun checkIn(goalId: Long, onDone: (Long) -> Unit = {}) {
+        viewModelScope.launch {
+            val id = repo.checkIn(goalId)
+            onDone(id)
+        }
     }
 
     /** 首页长按菜单：归档 / 取消归档 */

@@ -82,6 +82,7 @@ import com.youjin.app.ui.components.YoujinProgressBar
 import com.youjin.app.ui.components.appleRowClick
 import com.youjin.app.ui.components.goalColor
 import com.youjin.app.ui.components.showLifoUndoSnackbar
+import com.youjin.app.ui.record.CheckinCalendar
 import com.youjin.app.ui.record.RecordSheet
 import com.youjin.app.ui.theme.AppleTheme
 import com.youjin.app.util.Dates
@@ -107,6 +108,7 @@ fun GoalDetailScreen(
 
     var showRecord by remember { mutableStateOf(false) }
     var editEntry by remember { mutableStateOf<ProgressEntry?>(null) }
+    var deleteEntryTarget by remember { mutableStateOf<ProgressEntry?>(null) }
     var showReminderDialog by remember { mutableStateOf(false) }
     var showNextActionDialog by remember { mutableStateOf(false) }
     var showDeleteGoal by remember { mutableStateOf(false) }
@@ -242,6 +244,10 @@ fun GoalDetailScreen(
                     )
                 }
 
+                if (current.type == GoalType.CHECKIN) {
+                    item { CheckinOverviewCard(current) }
+                }
+
                 if (current.type == GoalType.CHECKLIST) {
                     item {
                         AppleSectionHeader(
@@ -328,18 +334,22 @@ fun GoalDetailScreen(
                     )
                 }
 
-                // 记录历史仅适用于累计数值型；步骤清单型以步骤勾选为准
-                if (current.type == GoalType.CUMULATIVE) {
+                // 记录历史：累计型看数值流水，打卡型看打卡日期；步骤清单型以勾选为准
+                if (current.type != GoalType.CHECKLIST) {
                     item {
                         AppleSectionHeader(
-                            "记录历史",
+                            if (current.type == GoalType.CHECKIN) "打卡历史" else "记录历史",
                             Modifier.padding(top = 12.dp, bottom = 0.dp),
                         )
                     }
                     if (entries.isEmpty()) {
                         item {
                             Text(
-                                "还没有记录，点击右下角按钮开始",
+                                if (current.type == GoalType.CHECKIN) {
+                                    "还没有打过卡，点击右下角按钮开始"
+                                } else {
+                                    "还没有记录，点击右下角按钮开始"
+                                },
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = colors.secondaryLabel,
                             )
@@ -348,11 +358,18 @@ fun GoalDetailScreen(
                         item {
                             AppleGroup {
                                 entries.forEachIndexed { index, entry ->
-                                    EntryRow(
-                                        goal = current,
-                                        entry = entry,
-                                        onClick = { editEntry = entry },
-                                    )
+                                    if (current.type == GoalType.CHECKIN) {
+                                        CheckinHistoryRow(
+                                            entry = entry,
+                                            onDelete = { deleteEntryTarget = entry },
+                                        )
+                                    } else {
+                                        EntryRow(
+                                            goal = current,
+                                            entry = entry,
+                                            onClick = { editEntry = entry },
+                                        )
+                                    }
                                     if (index < entries.lastIndex) Hairline(startIndent = 18.dp)
                                 }
                             }
@@ -399,6 +416,31 @@ fun GoalDetailScreen(
                 contentDescription = "记录进展",
                 icon = Icons.Default.Add,
                 text = "记录",
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(20.dp),
+            )
+        }
+
+        if (current.type == GoalType.CHECKIN &&
+            current.status == GoalStatus.ACTIVE &&
+            !current.checkedToday()
+        ) {
+            AppleFloatingButton(
+                onClick = {
+                    vm.checkIn { entryId ->
+                        scope.showLifoUndoSnackbar(
+                            host = snackbar,
+                            message = "已打卡「${current.name}」",
+                        ) {
+                            vm.deleteEntry(entryId)
+                        }
+                    }
+                },
+                contentDescription = "今天打卡",
+                icon = Icons.Default.Add,
+                text = "打卡",
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .navigationBarsPadding()
@@ -513,6 +555,20 @@ fun GoalDetailScreen(
             onDismiss = { deleteStepTarget = null },
         )
     }
+
+    deleteEntryTarget?.let { entry ->
+        ConfirmDialog(
+            title = "撤销这次打卡？",
+            text = "将删除 ${Dates.formatDayFull(entry.occurDate)} 的打卡记录。",
+            confirmLabel = "撤销",
+            destructive = true,
+            onConfirm = {
+                vm.deleteEntry(entry.id)
+                deleteEntryTarget = null
+            },
+            onDismiss = { deleteEntryTarget = null },
+        )
+    }
 }
 
 @Composable
@@ -572,6 +628,19 @@ private fun DetailHeader(goal: Goal) {
                 Text(
                     "已完成 ${goal.currentValue.toInt()} / ${goal.stepsTotal} 个步骤",
                     style = MaterialTheme.typography.titleMedium,
+                )
+            }
+            GoalType.CHECKIN -> {
+                Text(
+                    "已打卡 ${goal.currentValue.toInt()} / ${goal.targetValue.toInt()} 天",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    "连续 ${goal.checkinStreak} 天 · 最长 ${goal.checkinBestStreak} 天" +
+                        if (goal.checkedToday()) " · 今天已打卡" else "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.secondaryLabel,
                 )
             }
         }
@@ -781,6 +850,82 @@ private fun EntryRow(goal: Goal, entry: ProgressEntry, onClick: () -> Unit) {
             contentDescription = "编辑记录",
             tint = colors.tertiaryLabel,
             modifier = Modifier.size(15.dp),
+        )
+    }
+}
+
+@Composable
+private fun CheckinOverviewCard(goal: Goal) {
+    val colors = AppleTheme.colors
+    val today = Dates.todayEpochDay()
+    val weekCount = ProgressCalculator.checkinsInWeek(
+        goal.checkinDates,
+        ProgressCalculator.weekStart(today),
+    )
+    AppleCard {
+        Row(Modifier.fillMaxWidth()) {
+            StatCell("连续", "${goal.checkinStreak} 天", Modifier.weight(1f))
+            StatCell("本周", "$weekCount 天", Modifier.weight(1f))
+            StatCell("最长", "${goal.checkinBestStreak} 天", Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(14.dp))
+        Text(
+            if (goal.checkedToday()) "今天已打卡" else "今天还没打卡",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (goal.checkedToday()) colors.green else colors.tertiaryLabel,
+        )
+        Spacer(Modifier.height(14.dp))
+        CheckinCalendar(dates = goal.checkinDates.toSet(), today = today)
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "近 10 周打卡情况；蓝色为已打卡，空心框是今天。",
+            style = MaterialTheme.typography.labelSmall,
+            color = colors.tertiaryLabel,
+        )
+    }
+}
+
+@Composable
+private fun StatCell(label: String, value: String, modifier: Modifier = Modifier) {
+    val colors = AppleTheme.colors
+    Column(modifier) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = colors.secondaryLabel,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(value, style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+@Composable
+private fun CheckinHistoryRow(entry: ProgressEntry, onDelete: () -> Unit) {
+    val colors = AppleTheme.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 18.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            Dates.formatDayFull(entry.occurDate),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            "打卡",
+            style = MaterialTheme.typography.titleSmall,
+            color = colors.blue,
+        )
+        Spacer(Modifier.width(4.dp))
+        AppleIconButton(
+            icon = Icons.Default.Delete,
+            contentDescription = "撤销这次打卡",
+            onClick = onDelete,
+            tint = colors.tertiaryLabel,
+            size = 36.dp,
+            iconSize = 16.dp,
         )
     }
 }

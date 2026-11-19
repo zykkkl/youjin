@@ -70,4 +70,49 @@ class ProgressCalculatorTest {
         assertEquals(100, ProgressCalculator.percent(1.0))
         assertEquals(0, ProgressCalculator.percent(0.0))
     }
+
+    @Test
+    fun checkinCurrent_countsDistinctDays() {
+        assertEquals(3.0, ProgressCalculator.checkinCurrent(listOf(10L, 10L, 11L, 12L)), 1e-9)
+        assertEquals(0.0, ProgressCalculator.checkinCurrent(emptyList()), 1e-9)
+    }
+
+    @Test
+    fun currentStreak_countsFromTodayOrYesterday() {
+        val today = 100L
+        // 今天已打卡，连续 3 天
+        assertEquals(
+            3,
+            ProgressCalculator.currentStreak(setOf(today, today - 1, today - 2), today),
+        )
+        // 今天还没打卡，从昨天往前数，连续 2 天
+        assertEquals(
+            2,
+            ProgressCalculator.currentStreak(setOf(today - 1, today - 2), today),
+        )
+        // 断了一天：今天和昨天都没有
+        assertEquals(
+            0,
+            ProgressCalculator.currentStreak(setOf(today - 2, today - 3), today),
+        )
+        assertEquals(0, ProgressCalculator.currentStreak(emptySet(), today))
+    }
+
+    @Test
+    fun bestStreak_findsLongestRun() {
+        val today = 100L
+        assertEquals(0, ProgressCalculator.bestStreak(emptySet()))
+        assertEquals(1, ProgressCalculator.bestStreak(setOf(today)))
+        assertEquals(
+            4,
+            ProgressCalculator.bestStreak(setOf(10L, 11L, 12L, 13L, 20L, 22L)),
+        )
+    }
+
+    @Test
+    fun checkinsInWeek_countsDaysInsideWeek() {
+        val monday = LocalDate.of(2026, 10, 19).toEpochDay()
+        val dates = listOf(monday, monday + 1, monday + 6, monday + 7)
+        assertEquals(3, ProgressCalculator.checkinsInWeek(dates, monday))
+    }
 }

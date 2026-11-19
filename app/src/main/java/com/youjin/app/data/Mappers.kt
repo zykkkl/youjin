@@ -40,10 +40,20 @@ fun GoalEntity.toDomain(
         currentValue = current,
         ratio = ratio,
         stepsTotal = if (type.toGoalType() == GoalType.CHECKLIST) steps.size else 0,
+        checkinDates = if (type.toGoalType() == GoalType.CHECKIN) {
+            entries.map { it.occurDate }.distinct().sorted()
+        } else {
+            emptyList()
+        },
     )
 }
 
-/** 统一进度计算：清单型以步骤完成数为 currentValue，比例 = 已完成 / 总数 */
+/**
+ * 统一进度计算：
+ * - 累计型：初始量 + 记录增量之和
+ * - 清单型：已完成步骤数
+ * - 打卡型：去重后的打卡天数
+ */
 internal fun computeProgress(
     goal: GoalEntity,
     entries: List<ProgressEntryEntity>,
@@ -56,6 +66,10 @@ internal fun computeProgress(
     GoalType.CHECKLIST -> {
         val done = steps.count { it.done }
         done.toDouble() to ProgressCalculator.checklistRatio(done, steps.size)
+    }
+    GoalType.CHECKIN -> {
+        val count = ProgressCalculator.checkinCurrent(entries.map { it.occurDate })
+        count to ProgressCalculator.cumulativeRatio(count, goal.targetValue)
     }
 }
 

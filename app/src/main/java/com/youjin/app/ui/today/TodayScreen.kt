@@ -64,6 +64,7 @@ import com.youjin.app.ui.components.appleRowClick
 import com.youjin.app.ui.components.goalColor
 import com.youjin.app.ui.components.showLifoUndoSnackbar
 import com.youjin.app.ui.record.ChecklistSheet
+import com.youjin.app.ui.record.CheckinSheet
 import com.youjin.app.ui.record.RecordSheet
 import com.youjin.app.ui.theme.AppleTheme
 import com.youjin.app.util.Dates
@@ -86,7 +87,9 @@ fun TodayScreen(
 
     var recordGoal by remember { mutableStateOf<Goal?>(null) }
     var checklistGoal by remember { mutableStateOf<Goal?>(null) }
+    var checkinGoal by remember { mutableStateOf<Goal?>(null) }
     var editEntry by remember { mutableStateOf<ProgressEntry?>(null) }
+    var undoCheckinEntry by remember { mutableStateOf<ProgressEntry?>(null) }
     var undoTargetStep by remember { mutableStateOf<GoalStep?>(null) }
     var actionGoal by remember { mutableStateOf<Goal?>(null) }
     var confirmDeleteGoal by remember { mutableStateOf<Goal?>(null) }
@@ -142,11 +145,11 @@ fun TodayScreen(
                         goal = goal,
                         onOpen = { onOpenGoal(goal.id) },
                         onRecord = {
-                            // 记录逻辑按目标类型分流：数值型 → 数值面板；步骤型 → 步骤勾选面板
-                            if (goal.type == GoalType.CUMULATIVE) {
-                                recordGoal = goal
-                            } else {
-                                checklistGoal = goal
+                            // 记录逻辑按目标类型分流：数值 → 数值面板；步骤 → 步骤勾选；打卡 → 打卡面板
+                            when (goal.type) {
+                                GoalType.CUMULATIVE -> recordGoal = goal
+                                GoalType.CHECKLIST -> checklistGoal = goal
+                                GoalType.CHECKIN -> checkinGoal = goal
                             }
                         },
                         onLongPress = { actionGoal = goal },
@@ -188,7 +191,13 @@ fun TodayScreen(
                                         is TodayRecord.EntryRecord -> TodayEntryRow(
                                             goal = state.goalsById[record.entry.goalId],
                                             entry = record.entry,
-                                            onClick = { editEntry = record.entry },
+                                            onClick = {
+                                                if (state.goalsById[record.entry.goalId]?.type == GoalType.CHECKIN) {
+                                                    undoCheckinEntry = record.entry
+                                                } else {
+                                                    editEntry = record.entry
+                                                }
+                                            },
                                         )
 
                                         is TodayRecord.StepRecord -> TodayStepRow(
@@ -246,6 +255,35 @@ fun TodayScreen(
         )
     }
 
+    // ---- 打卡面板（打卡型：一天一次，可撤销今天） ----
+    checkinGoal?.let { selected ->
+        val goal = state.goalsById[selected.id] ?: selected
+        CheckinSheet(
+            goal = goal,
+            onCheckIn = {
+                vm.checkIn(goal.id) { entryId ->
+                    scope.showLifoUndoSnackbar(
+                        host = snackbar,
+                        message = "已打卡「${goal.name}」",
+                    ) {
+                        vm.deleteEntry(entryId)
+                    }
+                }
+            },
+            onUndoCheckIn = {
+                state.todayEntryByGoal[goal.id]?.let { entryId ->
+                    vm.deleteEntry(entryId)
+                    scope.launch { snackbar.showSnackbar("已撤销今天的打卡") }
+                }
+            },
+            onOpenDetail = {
+                checkinGoal = null
+                onOpenGoal(goal.id)
+            },
+            onDismiss = { checkinGoal = null },
+        )
+    }
+
     // ---- 记录面板（编辑） ----
     editEntry?.let { entry ->
         val goal = state.goalsById[entry.goalId]
@@ -264,6 +302,20 @@ fun TodayScreen(
                 onDismiss = { editEntry = null },
             )
         }
+    }
+
+    undoCheckinEntry?.let { entry ->
+        ConfirmDialog(
+            title = "撤销这次打卡？",
+            text = "将删除 ${Dates.formatDay(entry.occurDate)} 的打卡记录。",
+            confirmLabel = "撤销",
+            destructive = true,
+            onConfirm = {
+                vm.deleteEntry(entry.id)
+                undoCheckinEntry = null
+            },
+            onDismiss = { undoCheckinEntry = null },
+        )
     }
 
     undoTargetStep?.let { step ->
@@ -407,7 +459,11 @@ private fun TodayEntryRow(
         )
         Column(Modifier.weight(1f)) {
             Text(
-                "${goal?.name ?: "（目标已删除）"}  +${formatNumber(entry.delta)} ${goal?.unit ?: ""}",
+                if (goal?.type == GoalType.CHECKIN) {
+                    "${goal.name}  打卡"
+                } else {
+                    "${goal?.name ?: "（目标已删除）"}  +${formatNumber(entry.delta)} ${goal?.unit ?: ""}"
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -433,7 +489,7 @@ private fun TodayEntryRow(
         Spacer(Modifier.width(8.dp))
         Icon(
             Icons.Default.Edit,
-            contentDescription = "编辑记录",
+            contentDescription = if (goal?.type == GoalType.CHECKIN) "撤销打卡" else "编辑记录",
             tint = colors.tertiaryLabel,
             modifier = Modifier.size(15.dp),
         )

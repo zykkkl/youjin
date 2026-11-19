@@ -145,16 +145,42 @@ class GoalRepository(
     suspend fun addEntry(goalId: Long, delta: Double, occurDate: Long, note: String?): Long {
         require(delta > 0) { "新增量必须大于 0" }
         require(occurDate <= Dates.todayEpochDay()) { "实际进展不能记在未来" }
-        // 规则隔离：步骤清单型目标的进度来自步骤勾选，不允许写入数值记录
+        // 规则隔离：清单型走步骤勾选，打卡型走每日打卡，都不允许写入任意数值记录
         val goal = goalDao.getById(goalId) ?: throw IllegalArgumentException("目标不存在")
-        require(goal.type.toGoalType() == GoalType.CUMULATIVE) {
-            "步骤清单型目标请通过勾选步骤记录进展"
+        val type = goal.type.toGoalType()
+        require(type == GoalType.CUMULATIVE) {
+            when (type) {
+                GoalType.CHECKIN -> "打卡型目标请通过「打卡」记录进展"
+                else -> "步骤清单型目标请通过勾选步骤记录进展"
+            }
         }
         val now = Dates.nowMillis()
         val id = entryDao.insert(
             ProgressEntryEntity(
                 goalId = goalId, delta = delta, occurDate = occurDate,
                 note = note?.takeIf { it.isNotBlank() }, createdAt = now, updatedAt = now,
+            )
+        )
+        reconcileCompleted(goalId)
+        return id
+    }
+
+    /**
+     * 打卡型目标：记录某一天已坚持。一天只允许一次，重复打卡会被拒绝；
+     * 打卡值固定为 1，进度按去重日期数统计。
+     */
+    suspend fun checkIn(goalId: Long, occurDate: Long = Dates.todayEpochDay()): Long {
+        require(occurDate <= Dates.todayEpochDay()) { "不能给未来的日期打卡" }
+        val goal = goalDao.getById(goalId) ?: throw IllegalArgumentException("目标不存在")
+        require(goal.type.toGoalType() == GoalType.CHECKIN) { "只有打卡型目标可以打卡" }
+        require(entryDao.getByGoal(goalId).none { it.occurDate == occurDate }) {
+            "这一天已经打过卡了"
+        }
+        val now = Dates.nowMillis()
+        val id = entryDao.insert(
+            ProgressEntryEntity(
+                goalId = goalId, delta = 1.0, occurDate = occurDate,
+                note = null, createdAt = now, updatedAt = now,
             )
         )
         reconcileCompleted(goalId)

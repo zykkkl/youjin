@@ -228,6 +228,8 @@ private fun SummaryCard(stats: ReviewRepository.WeekStats) {
                                 "${stat.name}：+${formatNumber(stat.delta)} ${stat.unit}（${stat.entryCount} 次）"
                             GoalType.CHECKLIST ->
                                 "${stat.name}：完成 ${stat.stepsDone} 个步骤"
+                            GoalType.CHECKIN ->
+                                "${stat.name}：打卡 ${stat.entryCount} 天"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.secondaryLabel,
@@ -262,6 +264,9 @@ private fun WeekGoalRow(stat: ReviewRepository.GoalWeekStat) {
                     else "本周暂无记录"
                 GoalType.CHECKLIST ->
                     if (stat.stepsDone > 0) "完成 ${stat.stepsDone} 个步骤"
+                    else "本周暂无记录"
+                GoalType.CHECKIN ->
+                    if (stat.entryCount > 0) "本周打卡 ${stat.entryCount} 天"
                     else "本周暂无记录"
             },
             style = MaterialTheme.typography.bodySmall,

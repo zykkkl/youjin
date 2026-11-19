@@ -41,6 +41,11 @@ object AiPrompts {
             }
 
             GoalType.CHECKLIST -> appendLine("目标类型：步骤清单（需要可勾选的步骤）")
+
+            GoalType.CHECKIN -> {
+                appendLine("目标类型：每日打卡（每天完成一次并打卡）")
+                appendLine("目标天数：${formatNumber(request.targetValue)} 天")
+            }
         }
         request.deadlineEpochDay?.let { appendLine("截止日期：${Dates.formatDayFull(it)}") }
         if (request.motivation.isNotBlank()) appendLine("动机：${request.motivation.trim().take(300)}")
@@ -90,6 +95,12 @@ object AiPrompts {
             "- ${goal.name}：本周完成 ${goal.stepsDone} 个步骤"
         } else {
             "- ${goal.name}：本周没有完成步骤"
+        }
+
+        GoalType.CHECKIN -> if (goal.entryCount > 0) {
+            "- ${goal.name}：本周打卡 ${goal.entryCount} 天"
+        } else {
+            "- ${goal.name}：本周没有打卡"
         }
     }
 

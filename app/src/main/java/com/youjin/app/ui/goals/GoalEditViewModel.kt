@@ -53,6 +53,8 @@ data class GoalEditState(
                     (initialValue ?: 0.0) >= 0
             GoalType.CHECKLIST ->
                 steps.map { it.trim() }.any { it.isNotEmpty() }
+            // 打卡型：只填目标天数，至少坚持 1 天
+            GoalType.CHECKIN -> (targetValue ?: 0.0) >= 1
         }
 }
 
@@ -93,7 +95,11 @@ class GoalEditViewModel(
                             type = goal.type,
                             category = goal.category,
                             unit = goal.unit,
-                            targetText = if (goal.type == GoalType.CUMULATIVE) formatNumber(goal.targetValue) else "",
+                            targetText = when (goal.type) {
+                                GoalType.CUMULATIVE -> formatNumber(goal.targetValue)
+                                GoalType.CHECKIN -> goal.targetValue.toInt().toString()
+                                GoalType.CHECKLIST -> ""
+                            },
                             initialText = formatNumber(goal.initialValue),
                             startDate = goal.startDate,
                             deadline = goal.deadline,
@@ -116,7 +122,11 @@ class GoalEditViewModel(
     fun setCategory(c: String?) = _state.update { it.copy(category = c) }
     fun setUnit(v: String) = _state.update { it.copy(unit = v.take(10)) }
     fun setTarget(v: String) = _state.update {
-        it.copy(targetText = v.filter { c -> c.isDigit() || c == '.' }.take(12))
+        if (it.type == GoalType.CHECKIN) {
+            it.copy(targetText = v.filter { c -> c.isDigit() }.take(5))
+        } else {
+            it.copy(targetText = v.filter { c -> c.isDigit() || c == '.' }.take(12))
+        }
     }
     fun setInitial(v: String) = _state.update {
         it.copy(initialText = v.filter { c -> c.isDigit() || c == '.' }.take(12))
@@ -193,13 +203,14 @@ class GoalEditViewModel(
         viewModelScope.launch {
             _state.update { it.copy(saving = true, error = null) }
             try {
+                val isCheckin = s.type == GoalType.CHECKIN
                 val draft = GoalDraft(
                     name = s.name.trim(),
                     type = s.type,
                     category = s.category,
-                    unit = s.unit.trim(),
-                    targetValue = if (s.type == GoalType.CUMULATIVE) (s.targetValue ?: 0.0) else 0.0,
-                    initialValue = s.initialValue ?: 0.0,
+                    unit = if (isCheckin) "天" else s.unit.trim(),
+                    targetValue = if (s.type == GoalType.CUMULATIVE || isCheckin) (s.targetValue ?: 0.0) else 0.0,
+                    initialValue = if (isCheckin) 0.0 else (s.initialValue ?: 0.0),
                     startDate = s.startDate,
                     deadline = s.deadline,
                     motivation = s.motivation.ifBlank { null },

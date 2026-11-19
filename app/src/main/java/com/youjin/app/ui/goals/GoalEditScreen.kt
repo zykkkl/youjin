@@ -155,10 +155,20 @@ fun GoalEditScreen(
                 }
                 item {
                     AppleSegmented(
-                        options = listOf("累计数值", "步骤清单"),
-                        selectedIndex = if (state.type == GoalType.CUMULATIVE) 0 else 1,
+                        options = listOf("累计数值", "步骤清单", "打卡坚持"),
+                        selectedIndex = when (state.type) {
+                            GoalType.CUMULATIVE -> 0
+                            GoalType.CHECKLIST -> 1
+                            GoalType.CHECKIN -> 2
+                        },
                         onSelect = { index ->
-                            vm.setType(if (index == 0) GoalType.CUMULATIVE else GoalType.CHECKLIST)
+                            vm.setType(
+                                when (index) {
+                                    0 -> GoalType.CUMULATIVE
+                                    1 -> GoalType.CHECKLIST
+                                    else -> GoalType.CHECKIN
+                                }
+                            )
                         },
                         enabled = !state.isEdit,
                     )
@@ -222,7 +232,35 @@ fun GoalEditScreen(
                     }
                 }
 
-                if (state.type == GoalType.CUMULATIVE) {
+                if (state.type == GoalType.CHECKIN) {
+                    item {
+                        AppleSectionHeader(
+                            "目标天数",
+                            Modifier.padding(top = 10.dp, bottom = 0.dp),
+                        )
+                    }
+                    item {
+                        Column {
+                            FieldLabel("坚持多少天（每天打卡一次）")
+                            AppleTextField(
+                                value = state.targetText,
+                                onValueChange = vm::setTarget,
+                                placeholder = "30",
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                isError = state.targetText.isNotEmpty() &&
+                                    (state.targetValue ?: 0.0) < 1,
+                            )
+                        }
+                    }
+                    item {
+                        Text(
+                            "打卡型不用填单位，进度就是实际打卡的天数；同一天只算一次。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.tertiaryLabel,
+                            modifier = Modifier.padding(start = 4.dp),
+                        )
+                    }
+                } else if (state.type == GoalType.CUMULATIVE) {
                     item {
                         AppleSectionHeader(
                             "目标值",
@@ -360,9 +398,9 @@ fun GoalEditScreen(
                                         Text(step, style = MaterialTheme.typography.bodyMedium)
                                     }
                                 }
-                            } else if (state.type == GoalType.CUMULATIVE) {
+                            } else if (state.type == GoalType.CUMULATIVE || state.type == GoalType.CHECKIN) {
                                 Text(
-                                    "累计数值型只采纳「下一步行动」，步骤请用步骤清单型目标。",
+                                    "累计数值型与打卡型只采纳「下一步行动」，步骤请用步骤清单型目标。",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = colors.secondaryLabel,
                                 )

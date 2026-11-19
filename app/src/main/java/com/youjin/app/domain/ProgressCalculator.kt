@@ -21,6 +21,45 @@ object ProgressCalculator {
     fun checklistRatio(doneCount: Int, totalCount: Int): Double =
         if (totalCount <= 0) 0.0 else (doneCount.toDouble() / totalCount).coerceIn(0.0, 1.0)
 
+    /** 打卡型：当前值 = 已打卡天数（同一天多次打卡只算一天） */
+    fun checkinCurrent(dates: Collection<Long>): Double = dates.toSet().size.toDouble()
+
+    /**
+     * 打卡型：当前连续天数。
+     * 今天已打卡则从今天往前数；今天还没打卡时从昨天往前数——当天尚未结束，不算断。
+     */
+    fun currentStreak(dates: Set<Long>, today: Long): Int {
+        if (dates.isEmpty()) return 0
+        var cursor = when {
+            dates.contains(today) -> today
+            dates.contains(today - 1) -> today - 1
+            else -> return 0
+        }
+        var count = 0
+        while (dates.contains(cursor)) {
+            count++
+            cursor--
+        }
+        return count
+    }
+
+    /** 打卡型：历史最长连续天数 */
+    fun bestStreak(dates: Set<Long>): Int {
+        if (dates.isEmpty()) return 0
+        val sorted = dates.sorted()
+        var best = 1
+        var run = 1
+        for (i in 1 until sorted.size) {
+            run = if (sorted[i] == sorted[i - 1] + 1) run + 1 else 1
+            if (run > best) best = run
+        }
+        return best
+    }
+
+    /** 打卡型：一周内的打卡天数 */
+    fun checkinsInWeek(dates: Collection<Long>, weekStart: Long): Int =
+        dates.count { inWeek(it, weekStart) }
+
     /** 周起始（周一）的 epochDay */
     fun weekStart(epochDay: Long): Long =
         LocalDate.ofEpochDay(epochDay).with(DayOfWeek.MONDAY).toEpochDay()

@@ -1,7 +1,9 @@
 package com.youjin.app.domain
 
-/** 目标类型：首版支持累计数值与步骤清单 */
-enum class GoalType { CUMULATIVE, CHECKLIST }
+import com.youjin.app.util.Dates
+
+/** 目标类型：累计数值、步骤清单、每日打卡 */
+enum class GoalType { CUMULATIVE, CHECKLIST, CHECKIN }
 
 /** 目标状态：进行中 / 暂停 / 完成 / 归档 */
 enum class GoalStatus { ACTIVE, PAUSED, COMPLETED, ARCHIVED }
@@ -42,15 +44,29 @@ data class Goal(
     val ratio: Double,
     /** 清单型：步骤总数（累计型为 0） */
     val stepsTotal: Int,
+    /** 打卡型：已打卡日期（epochDay，升序去重）；其他类型为空 */
+    val checkinDates: List<Long> = emptyList(),
 ) {
+    /** 打卡型：当前连续天数（今天未打卡时从昨天算起，当天还没结束不算断） */
+    val checkinStreak: Int
+        get() = ProgressCalculator.currentStreak(checkinDates.toSet(), Dates.todayEpochDay())
+
+    /** 打卡型：历史最长连续天数 */
+    val checkinBestStreak: Int
+        get() = ProgressCalculator.bestStreak(checkinDates.toSet())
+
+    /** 打卡型：今天是否已打卡 */
+    fun checkedToday(): Boolean = checkinDates.contains(Dates.todayEpochDay())
+
     val isOverdue: Boolean
         get() = status == GoalStatus.ACTIVE && deadline != null &&
             deadline!! < java.time.LocalDate.now().toEpochDay()
 
-    /** 是否已达到终点：累计型看数值，清单型看全部步骤完成（且至少有一个步骤） */
+    /** 是否已达到终点：累计型看数值，清单型看全部步骤完成，打卡型看累计天数 */
     fun reachedTarget(): Boolean = when (type) {
         GoalType.CUMULATIVE -> targetValue > 0.0 && currentValue >= targetValue
         GoalType.CHECKLIST -> ratio >= 1.0
+        GoalType.CHECKIN -> targetValue > 0.0 && currentValue >= targetValue
     }
 
     fun iconEmoji(): String = GOAL_EMOJIS[iconIndex.coerceIn(0, GOAL_EMOJIS.lastIndex)]
