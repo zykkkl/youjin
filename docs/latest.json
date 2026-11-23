@@ -1,6 +1,6 @@
 {
-  "versionCode": 10,
-  "versionName": "0.3.0",
-  "apkUrl": "https://github.com/zykkkl/youjin/releases/download/v0.3.0/youjin-0.3.0.apk",
-  "notes": "新增打卡坚持型目标：一天打一次卡，显示连续天数、最长连续、本周打卡与近 10 周日历，支持撤销今日打卡与删除历史打卡；周回顾与 AI 复盘同步支持打卡型目标。"
+  "versionCode": 11,
+  "versionName": "0.4.0",
+  "apkUrl": "https://github.com/zykkkl/youjin/releases/download/v0.4.0/youjin-0.4.0.apk",
+  "notes": "新增「计划」页：按周列出计划，完成一项打一个勾；四象限坐标（重要性 × 紧急性）里每个事项是一个圆点，可拖动调整，完成后圆点消失。"
 }
