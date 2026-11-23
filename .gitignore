@@ -16,3 +16,6 @@ keystore.properties
 
 # 本地打包产物（上传 GitHub Release 用，不提交进仓库）
 dist/
+
+# Windows 控制台设备节点（勿提交）
+CON

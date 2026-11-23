@@ -113,7 +113,7 @@ class SettingsViewModel(
             runCatching { backup.importJson(uri) }
                 .onSuccess { r ->
                     val orphanNote = if (r.droppedOrphans > 0) "（已跳过 ${r.droppedOrphans} 条失效数据）" else ""
-                    _messages.emit("恢复完成：目标 ${r.goals} 个、记录 ${r.entries} 条、步骤 ${r.steps} 个$orphanNote")
+                    _messages.emit("恢复完成：目标 ${r.goals} 个、记录 ${r.entries} 条、步骤 ${r.steps} 个、计划 ${r.planItems} 项$orphanNote")
                 }
                 .onFailure { _messages.emit("恢复失败，数据未变更：${it.message}") }
         }

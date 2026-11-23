@@ -4,6 +4,7 @@ import android.app.Application
 import com.youjin.app.data.AppDatabase
 import com.youjin.app.data.BackupManager
 import com.youjin.app.data.GoalRepository
+import com.youjin.app.data.PlanRepository
 import com.youjin.app.data.ReviewRepository
 import com.youjin.app.data.SettingsRepository
 import com.youjin.app.data.UpdateChecker
@@ -44,6 +45,8 @@ class AppContainer(private val app: Application) {
     }
 
     val settingsRepository: SettingsRepository by lazy { SettingsRepository(app) }
+
+    val planRepository: PlanRepository by lazy { PlanRepository(database.planItemDao()) }
 
     val backupManager: BackupManager by lazy { BackupManager(app, database, reminderScheduler) }
 

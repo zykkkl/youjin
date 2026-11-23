@@ -33,6 +33,7 @@ class BackupManager(
         val reminders: Int,
         val reviews: Int,
         val changes: Int,
+        val planItems: Int,
         val droppedOrphans: Int,
         val snapshotPath: String?,
     )
@@ -43,6 +44,7 @@ class BackupManager(
     private val reminderDao get() = db.reminderDao()
     private val reviewDao get() = db.reviewDao()
     private val changeDao get() = db.changeDao()
+    private val planItemDao get() = db.planItemDao()
 
     // ---------- 导出 ----------
 
@@ -109,11 +111,15 @@ class BackupManager(
         val reviews = parseReviews(root.optJSONArray("reviews"))
         val changes = parseChanges(root.optJSONArray("changes"))
             .filter { c -> if (c.goalId in goalIds) true else { dropped++; false } }
+        // 计划事项的目标可能已不存在：保留计划本身，把关联置空
+        val planItems = parsePlanItems(root.optJSONArray("planItems"))
+            .map { item -> if (item.goalId != null && item.goalId !in goalIds) item.copy(goalId = null) else item }
 
         // 保留当前快照，替换失败可恢复
         val snapshotPath = snapshotCurrent()
 
         db.withTransaction {
+            planItemDao.deleteAll()
             entryDao.deleteAll()
             stepDao.deleteAll()
             reminderDao.deleteAll()
@@ -126,6 +132,7 @@ class BackupManager(
             reminders.forEach { reminderDao.upsert(it) }
             reviews.forEach { reviewDao.upsert(it) }
             changes.forEach { changeDao.insert(it) }
+            planItems.forEach { planItemDao.insert(it) }
         }
 
         // 重新注册有效提醒（目标需存在且为进行中）
@@ -141,7 +148,7 @@ class BackupManager(
         ImportResult(
             goals = goals.size, entries = entries.size, steps = steps.size,
             reminders = reminders.size, reviews = reviews.size, changes = changes.size,
-            droppedOrphans = dropped, snapshotPath = snapshotPath,
+            planItems = planItems.size, droppedOrphans = dropped, snapshotPath = snapshotPath,
         )
     }
 
@@ -164,6 +171,7 @@ class BackupManager(
         val reminders = reminderDao.getAll()
         val reviews = reviewDao.getAll()
         val changes = changeDao.getAll()
+        val planItems = planItemDao.getAll()
 
         return JSONObject().apply {
             put("format", FORMAT)
@@ -175,6 +183,7 @@ class BackupManager(
             put("reminders", JSONArray().apply { reminders.forEach { put(reminderToJson(it)) } })
             put("reviews", JSONArray().apply { reviews.forEach { put(reviewToJson(it)) } })
             put("changes", JSONArray().apply { changes.forEach { put(changeToJson(it)) } })
+            put("planItems", JSONArray().apply { planItems.forEach { put(planItemToJson(it)) } })
         }
     }
 
@@ -210,6 +219,13 @@ class BackupManager(
     private fun reviewToJson(r: WeeklyReviewEntity) = JSONObject().apply {
         put("id", r.id); put("weekStart", r.weekStart); put("body", r.body)
         put("createdAt", r.createdAt); put("updatedAt", r.updatedAt)
+    }
+
+    private fun planItemToJson(item: PlanItemEntity) = JSONObject().apply {
+        put("id", item.id); put("weekStart", item.weekStart); put("title", item.title)
+        putOpt("goalId", item.goalId); put("importance", item.importance)
+        put("urgency", item.urgency); put("done", item.done); putOpt("doneAt", item.doneAt)
+        put("sortOrder", item.sortOrder); put("createdAt", item.createdAt); put("updatedAt", item.updatedAt)
     }
 
     private fun changeToJson(c: GoalChangeEntity) = JSONObject().apply {
@@ -315,6 +331,30 @@ class BackupManager(
                 createdAt = o.optLong("createdAt", Dates.nowMillis()),
                 updatedAt = o.optLong("updatedAt", Dates.nowMillis()),
             )
+        }
+        return out
+    }
+
+    private fun parsePlanItems(array: JSONArray?): List<PlanItemEntity> {
+        val out = mutableListOf<PlanItemEntity>()
+        if (array == null) return out
+        for (i in 0 until array.length()) {
+            val o = array.getJSONObject(i)
+            val title = o.optString("title", "").trim()
+            if (title.isEmpty()) continue
+            out += PlanItemEntity(
+                id = o.optLong("id", 0),
+                weekStart = o.optLong("weekStart", 0),
+                title = title,
+                goalId = o.optNullableLong("goalId"),
+                importance = o.optInt("importance", 5).coerceIn(1, 10),
+                urgency = o.optInt("urgency", 5).coerceIn(1, 10),
+                done = o.optBoolean("done", false),
+                doneAt = o.optNullableLong("doneAt"),
+                sortOrder = o.optInt("sortOrder", 0),
+                createdAt = o.optLong("createdAt", Dates.nowMillis()),
+                updatedAt = o.optLong("updatedAt", Dates.nowMillis()),
+            ).takeIf { it.weekStart > 0 } ?: continue
         }
         return out
     }

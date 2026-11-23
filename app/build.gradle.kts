@@ -19,6 +19,11 @@ val keystoreProps = Properties().apply {
 val hasReleaseKeystore = keystorePropsFile.exists() &&
     !keystoreProps.getProperty("storeFile").isNullOrBlank()
 
+ksp {
+    // 导出 Room schema，便于核对迁移与后续版本升级
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 android {
     namespace = "com.youjin.app"
     compileSdk = 35
@@ -27,8 +32,8 @@ android {
         applicationId = "com.youjin.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "0.3.0"
+        versionCode = 11
+        versionName = "0.4.0"
     }
 
     signingConfigs {

@@ -1,6 +1,7 @@
 package com.youjin.app.data
 
 import com.youjin.app.domain.Goal
+import com.youjin.app.domain.PlanItem
 import com.youjin.app.domain.GoalChange
 import com.youjin.app.domain.GoalStatus
 import com.youjin.app.domain.GoalStep
@@ -125,6 +126,13 @@ fun ReminderSpec.toEntity(): ReminderEntity = ReminderEntity(
 
 fun WeeklyReview.toEntity(): WeeklyReviewEntity = WeeklyReviewEntity(
     id = id, weekStart = weekStart, body = body, createdAt = createdAt, updatedAt = updatedAt,
+)
+
+fun PlanItemEntity.toDomain(): PlanItem = PlanItem(
+    id = id, weekStart = weekStart, title = title, goalId = goalId,
+    importance = importance.coerceIn(1, 10), urgency = urgency.coerceIn(1, 10),
+    done = done, doneAt = doneAt, sortOrder = sortOrder,
+    createdAt = createdAt, updatedAt = updatedAt,
 )
 
 // ---------- 枚举映射（容忍历史脏数据） ----------

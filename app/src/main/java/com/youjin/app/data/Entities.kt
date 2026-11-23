@@ -115,3 +115,34 @@ data class GoalChangeEntity(
     val newValue: String,
     val changedAt: Long,
 )
+
+/**
+ * 周计划事项：属于某一周（weekStart = 周一 epochDay），
+ * 用「重要性 / 紧急性」两个 1..10 的分值定位在四象限图上。
+ */
+@Entity(
+    tableName = "plan_items",
+    foreignKeys = [ForeignKey(
+        entity = GoalEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["goalId"],
+        onDelete = ForeignKey.SET_NULL
+    )],
+    indices = [Index("weekStart"), Index("goalId")]
+)
+data class PlanItemEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val weekStart: Long,
+    val title: String,
+    /** 可选：关联的目标，目标删除后置空 */
+    val goalId: Long?,
+    /** 1..10，越高越重要 */
+    val importance: Int,
+    /** 1..10，越高越紧急 */
+    val urgency: Int,
+    val done: Boolean,
+    val doneAt: Long?,
+    val sortOrder: Int,
+    val createdAt: Long,
+    val updatedAt: Long,
+)

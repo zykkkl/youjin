@@ -151,3 +151,30 @@ interface ChangeDao {
     @Query("DELETE FROM goal_changes")
     suspend fun deleteAll()
 }
+
+@Dao
+interface PlanItemDao {
+    @Query("SELECT * FROM plan_items WHERE weekStart = :weekStart ORDER BY done ASC, id ASC")
+    fun observeByWeek(weekStart: Long): Flow<List<PlanItemEntity>>
+
+    @Query("SELECT * FROM plan_items WHERE id = :id")
+    suspend fun getById(id: Long): PlanItemEntity?
+
+    @Query("SELECT * FROM plan_items")
+    suspend fun getAll(): List<PlanItemEntity>
+
+    @Query("SELECT COUNT(*) FROM plan_items WHERE weekStart = :weekStart AND done = 1")
+    suspend fun countDone(weekStart: Long): Int
+
+    @Insert
+    suspend fun insert(item: PlanItemEntity): Long
+
+    @Update
+    suspend fun update(item: PlanItemEntity)
+
+    @Query("DELETE FROM plan_items WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM plan_items")
+    suspend fun deleteAll()
+}

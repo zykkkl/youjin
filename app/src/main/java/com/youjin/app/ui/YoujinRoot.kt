@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Scaffold
@@ -37,6 +38,8 @@ import com.youjin.app.ui.goals.GoalEditScreen
 import com.youjin.app.ui.goals.GoalEditViewModel
 import com.youjin.app.ui.goals.GoalsScreen
 import com.youjin.app.ui.goals.GoalsViewModel
+import com.youjin.app.ui.plans.PlanScreen
+import com.youjin.app.ui.plans.PlanViewModel
 import com.youjin.app.ui.review.ReviewScreen
 import com.youjin.app.ui.review.ReviewViewModel
 import com.youjin.app.ui.settings.AiSettingsScreen
@@ -50,6 +53,7 @@ import com.youjin.app.ui.today.TodayViewModel
 /** 页面路由。GoalEdit 携带唯一 navId，保证每次新建/编辑获得全新的 ViewModel 状态 */
 sealed interface Route {
     data object Today : Route
+    data object Plan : Route
     data object Goals : Route
     data object Review : Route
     data object Settings : Route
@@ -106,14 +110,16 @@ fun YoujinRoot(
     val tabs = remember {
         listOf(
             AppleTab("今天", Icons.Default.DateRange),
+            AppleTab("计划", Icons.Default.CheckCircle),
             AppleTab("目标", Icons.AutoMirrored.Filled.List),
             AppleTab("回顾", Icons.Default.Star),
         )
     }
     val tabIndex = when (current) {
         is Route.Today -> 0
-        is Route.Goals -> 1
-        is Route.Review -> 2
+        is Route.Plan -> 1
+        is Route.Goals -> 2
+        is Route.Review -> 3
         else -> -1
     }
     val showFab = current is Route.Today || current is Route.Goals
@@ -131,7 +137,8 @@ fun YoujinRoot(
                         switchTab(
                             when (index) {
                                 0 -> Route.Today
-                                1 -> Route.Goals
+                                1 -> Route.Plan
+                                2 -> Route.Goals
                                 else -> Route.Review
                             }
                         )
@@ -169,6 +176,15 @@ fun YoujinRoot(
                             onOpenGoal = { navigate(Route.GoalDetail(it)) },
                             onOpenSettings = { navigate(Route.Settings) },
                         )
+                    }
+
+                    is Route.Plan -> {
+                        val vm: PlanViewModel = viewModel(
+                            factory = viewModelFactory {
+                                initializer { PlanViewModel(container.planRepository, container.goalRepository) }
+                            }
+                        )
+                        PlanScreen(vm)
                     }
 
                     is Route.Goals -> {
