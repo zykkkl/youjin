@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -97,6 +98,7 @@ fun PlanScreen(vm: PlanViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(bottom = 28.dp),
     ) {
@@ -361,23 +363,15 @@ private fun EisenhowerMatrix(
     val plotHeight = 258.dp
 
     Column {
-        Row(Modifier.fillMaxWidth()) {
-            // 纵轴标签放在坐标区外，避免与象限标注挤在一起
-            Box(
-                modifier = Modifier
-                    .width(18.dp)
-                    .height(plotHeight),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "重要性",
-                    modifier = Modifier.rotate(-90f),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = p.secondaryLabel,
-                    maxLines = 1,
-                )
-            }
+        // 轴标签放在坐标区上方/下方，不参与格子布局，避免与象限名重叠或被截断
+        Text(
+            text = "重要性 ↑",
+            modifier = Modifier.padding(bottom = 6.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = p.secondaryLabel,
+        )
 
+        Row(Modifier.fillMaxWidth()) {
             BoxWithConstraints(
                 modifier = Modifier
                     .weight(1f)

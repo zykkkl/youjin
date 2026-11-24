@@ -213,6 +213,8 @@ fun AppleLargeTitle(
                     subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = p.secondaryLabel,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

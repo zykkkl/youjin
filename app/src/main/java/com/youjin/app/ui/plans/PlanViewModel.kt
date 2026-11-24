@@ -62,7 +62,7 @@ data class PlanUiState(
         get() = weekStart == ProgressCalculator.weekStart(Dates.todayEpochDay())
 
     val weekLabel: String
-        get() = "${Dates.formatMonthDayWeekday(weekStart)} – ${Dates.formatMonthDayWeekday(weekStart + 6)}"
+        get() = "${Dates.formatMonthDayShort(weekStart)} – ${Dates.formatMonthDayShort(weekStart + 6)}"
 }
 
 class PlanViewModel(

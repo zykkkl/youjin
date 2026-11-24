@@ -25,6 +25,7 @@ object Dates {
     private val dayFullFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日", Locale.CHINA)
     private val weekdayFormatter = DateTimeFormatter.ofPattern("EEEE", Locale.CHINA)
     private val monthDayWeekdayFormatter = DateTimeFormatter.ofPattern("M月d日，EEEE", Locale.CHINA)
+    private val shortDayFormatter = DateTimeFormatter.ofPattern("M.d", Locale.CHINA)
 
     /** "10月22日" */
     fun formatDay(epochDay: Long): String = LocalDate.ofEpochDay(epochDay).format(dayFormatter)
@@ -34,6 +35,10 @@ object Dates {
 
     /** "星期三" */
     fun formatWeekday(epochDay: Long): String = LocalDate.ofEpochDay(epochDay).format(weekdayFormatter)
+
+    /** "11.23"（紧凑展示，用于周标签） */
+    fun formatMonthDayShort(epochDay: Long): String =
+        LocalDate.ofEpochDay(epochDay).format(shortDayFormatter)
 
     /** "10月22日，星期三" */
     fun formatMonthDayWeekday(epochDay: Long): String =
