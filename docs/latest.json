@@ -1,6 +1,6 @@
 {
-  "versionCode": 12,
-  "versionName": "0.4.1",
-  "apkUrl": "https://github.com/zykkkl/youjin/releases/download/v0.4.1/youjin-0.4.1.apk",
-  "notes": "计划页排版修正：轴标签移到坐标区外、象限名精简、去掉多余标题、空态提示移到坐标图下方。"
+  "versionCode": 13,
+  "versionName": "0.4.2",
+  "apkUrl": "https://github.com/zykkkl/youjin/releases/download/v0.4.2/youjin-0.4.2.apk",
+  "notes": "计划页排版进一步修正：顶部留出状态栏间距、周日期单行显示、重要性/紧急性标签完整显示。"
 }
