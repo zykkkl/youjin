@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -128,19 +129,8 @@ fun PlanScreen(vm: PlanViewModel) {
             }
         }
 
-        AppleSectionHeader(
-            text = "四象限",
-            trailing = {
-                Text(
-                    text = "拖圆点调位置",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = p.tertiaryLabel,
-                )
-            },
-        )
-
         AppleCard(
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(10.dp),
         ) {
             EisenhowerMatrix(
@@ -368,134 +358,165 @@ private fun EisenhowerMatrix(
 ) {
     val p = AppleTheme.colors
     val density = LocalDensity.current
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(300.dp)
-            .clip(RoundedCornerShape(14.dp)),
-    ) {
-        val plotW = with(density) { maxWidth.toPx() }
-        val plotH = with(density) { maxHeight.toPx() }
-        val edge = with(density) { 14.dp.toPx() }
+    val plotHeight = 258.dp
 
-        Canvas(Modifier.fillMaxSize()) {
-            val halfW = size.width / 2f
-            val halfH = size.height / 2f
-            // 右上：重要且紧急（唯一的强调色，克制使用）
-            drawRect(
-                color = p.blue.copy(alpha = 0.07f),
-                topLeft = Offset(halfW, 0f),
-                size = Size(halfW, halfH),
-            )
-            drawRect(
-                color = p.fill.copy(alpha = 0.5f),
-                topLeft = Offset(0f, 0f),
-                size = Size(halfW, halfH),
-            )
-            drawRect(
-                color = p.fill.copy(alpha = 0.3f),
-                topLeft = Offset(halfW, halfH),
-                size = Size(halfW, halfH),
-            )
-            drawLine(p.separator, Offset(halfW, 0f), Offset(halfW, size.height), 1.dp.toPx())
-            drawLine(p.separator, Offset(0f, halfH), Offset(size.width, halfH), 1.dp.toPx())
+    Column {
+        Row(Modifier.fillMaxWidth()) {
+            // 纵轴标签放在坐标区外，避免与象限标注挤在一起
+            Box(
+                modifier = Modifier
+                    .width(18.dp)
+                    .height(plotHeight),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "重要性",
+                    modifier = Modifier.rotate(-90f),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = p.secondaryLabel,
+                    maxLines = 1,
+                )
+            }
+
+            BoxWithConstraints(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(plotHeight)
+                    .clip(RoundedCornerShape(12.dp)),
+            ) {
+                val plotW = with(density) { maxWidth.toPx() }
+                val plotH = with(density) { maxHeight.toPx() }
+                val edge = with(density) { 16.dp.toPx() }
+
+                Canvas(Modifier.fillMaxSize()) {
+                    val halfW = size.width / 2f
+                    val halfH = size.height / 2f
+                    drawRect(
+                        color = p.blue.copy(alpha = 0.07f),
+                        topLeft = Offset(halfW, 0f),
+                        size = Size(halfW, halfH),
+                    )
+                    drawRect(
+                        color = p.fill.copy(alpha = 0.5f),
+                        topLeft = Offset(0f, 0f),
+                        size = Size(halfW, halfH),
+                    )
+                    drawRect(
+                        color = p.fill.copy(alpha = 0.3f),
+                        topLeft = Offset(halfW, halfH),
+                        size = Size(halfW, halfH),
+                    )
+                    drawLine(p.separator, Offset(halfW, 0f), Offset(halfW, size.height), 1.dp.toPx())
+                    drawLine(p.separator, Offset(0f, halfH), Offset(size.width, halfH), 1.dp.toPx())
+                }
+
+                Text(
+                    text = "重要且紧急",
+                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = p.blue,
+                )
+                Text(
+                    text = "重要不紧急",
+                    modifier = Modifier.align(Alignment.TopStart).padding(top = 10.dp, start = 10.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = p.secondaryLabel,
+                )
+                Text(
+                    text = "紧急不重要",
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 10.dp, end = 10.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = p.secondaryLabel,
+                )
+                Text(
+                    text = "都不重要",
+                    modifier = Modifier.align(Alignment.BottomStart).padding(bottom = 10.dp, start = 10.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = p.tertiaryLabel,
+                )
+
+                items.forEach { item ->
+                    val position = overrides[item.id] ?: (item.importance to item.urgency)
+                    val importance = position.first
+                    val urgency = position.second
+                    val x = edge + planFraction(urgency) * (plotW - edge * 2)
+                    val y = edge + (1f - planFraction(importance)) * (plotH - edge * 2)
+                    val goal = item.goalId?.let { goalsById[it] }
+                    val dotColor = goal?.let { GoalPalette[it.colorIndex.coerceIn(0, GoalPalette.lastIndex)] } ?: p.blue
+
+                    Box(
+                        modifier = Modifier
+                            .offset { IntOffset((x - 11.dp.toPx()).roundToInt(), (y - 11.dp.toPx()).roundToInt()) }
+                            .size(22.dp)
+                            .pointerInput(item.id) {
+                                detectTapGestures { onOpen(item) }
+                            }
+                            .pointerInput(item.id, item.importance, item.urgency, plotW, plotH) {
+                                var accumulated = Offset.Zero
+                                val start = Offset(
+                                    planFraction(item.urgency) * (plotW - edge * 2) + edge,
+                                    (1f - planFraction(item.importance)) * (plotH - edge * 2) + edge,
+                                )
+                                detectDragGestures(
+                                    onDragStart = { accumulated = Offset.Zero },
+                                    onDragEnd = { onDragEnd(item) },
+                                    onDragCancel = { onDragEnd(item) },
+                                ) { change, dragAmount ->
+                                    change.consume()
+                                    accumulated += dragAmount
+                                    val nextX = (start.x + accumulated.x).coerceIn(edge, plotW - edge)
+                                    val nextY = (start.y + accumulated.y).coerceIn(edge, plotH - edge)
+                                    onDrag(
+                                        item.id,
+                                        planValue(1f - (nextY - edge) / (plotH - edge * 2)),
+                                        planValue((nextX - edge) / (plotW - edge * 2)),
+                                    )
+                                }
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Canvas(Modifier.fillMaxSize()) {
+                            drawCircle(color = p.card, radius = size.minDimension / 2f)
+                            drawCircle(color = dotColor, radius = size.minDimension / 2f - 1.5.dp.toPx())
+                        }
+                    }
+                }
+            }
         }
 
-        Text(
-            text = "重要且紧急 · 立即做",
-            modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = p.blue,
-        )
-        Text(
-            text = "重要不紧急 · 排期做",
-            modifier = Modifier.align(Alignment.TopStart).padding(10.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = p.secondaryLabel,
-        )
-        Text(
-            text = "紧急不重要 · 尽快处理",
-            modifier = Modifier.align(Alignment.BottomEnd).padding(10.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = p.secondaryLabel,
-        )
-        Text(
-            text = "都不重要 · 先不做",
-            modifier = Modifier.align(Alignment.BottomStart).padding(10.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = p.tertiaryLabel,
-        )
-
-        Text(
-            text = "紧急性",
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 30.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = p.tertiaryLabel,
-        )
-        Text(
-            text = "重要性",
+        Row(
             modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 10.dp, top = 30.dp)
-                .rotate(-90f),
-            style = MaterialTheme.typography.labelSmall,
-            color = p.tertiaryLabel,
-        )
+                .fillMaxWidth()
+                .padding(top = 6.dp),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            Text(
+                text = "紧急性 →",
+                style = MaterialTheme.typography.labelMedium,
+                color = p.secondaryLabel,
+            )
+        }
 
         if (items.isEmpty()) {
             Text(
                 text = "本周没有待办，点「＋ 添加」写一条",
-                modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = p.tertiaryLabel,
+                textAlign = TextAlign.Center,
             )
-        }
-
-        items.forEach { item ->
-            val position = overrides[item.id] ?: (item.importance to item.urgency)
-            val importance = position.first
-            val urgency = position.second
-            val x = edge + planFraction(urgency) * (plotW - edge * 2)
-            val y = edge + (1f - planFraction(importance)) * (plotH - edge * 2)
-            val goal = item.goalId?.let { goalsById[it] }
-            val dotColor = goal?.let { GoalPalette[it.colorIndex.coerceIn(0, GoalPalette.lastIndex)] } ?: p.blue
-
-            Box(
+        } else {
+            Text(
+                text = "拖动圆点可调整位置",
                 modifier = Modifier
-                    .offset { IntOffset((x - 11.dp.toPx()).roundToInt(), (y - 11.dp.toPx()).roundToInt()) }
-                    .size(22.dp)
-                    .pointerInput(item.id) {
-                        detectTapGestures { onOpen(item) }
-                    }
-                    .pointerInput(item.id, item.importance, item.urgency, plotW, plotH) {
-                        var accumulated = Offset.Zero
-                        val start = Offset(
-                            planFraction(item.urgency) * (plotW - edge * 2) + edge,
-                            (1f - planFraction(item.importance)) * (plotH - edge * 2) + edge,
-                        )
-                        detectDragGestures(
-                            onDragStart = { accumulated = Offset.Zero },
-                            onDragEnd = { onDragEnd(item) },
-                            onDragCancel = { onDragEnd(item) },
-                        ) { change, dragAmount ->
-                            change.consume()
-                            accumulated += dragAmount
-                            val nextX = (start.x + accumulated.x).coerceIn(edge, plotW - edge)
-                            val nextY = (start.y + accumulated.y).coerceIn(edge, plotH - edge)
-                            onDrag(
-                                item.id,
-                                planValue(1f - (nextY - edge) / (plotH - edge * 2)),
-                                planValue((nextX - edge) / (plotW - edge * 2)),
-                            )
-                        }
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Canvas(Modifier.fillMaxSize()) {
-                    drawCircle(color = p.card, radius = size.minDimension / 2f)
-                    drawCircle(color = dotColor, radius = size.minDimension / 2f - 1.5.dp.toPx())
-                }
-            }
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = p.tertiaryLabel,
+                textAlign = TextAlign.End,
+            )
         }
     }
 }
