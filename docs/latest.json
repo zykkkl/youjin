@@ -1,6 +1,6 @@
 {
-  "versionCode": 11,
-  "versionName": "0.4.0",
-  "apkUrl": "https://github.com/zykkkl/youjin/releases/download/v0.4.0/youjin-0.4.0.apk",
-  "notes": "新增「计划」页：按周列出计划，完成一项打一个勾；四象限坐标（重要性 × 紧急性）里每个事项是一个圆点，可拖动调整，完成后圆点消失。"
+  "versionCode": 12,
+  "versionName": "0.4.1",
+  "apkUrl": "https://github.com/zykkkl/youjin/releases/download/v0.4.1/youjin-0.4.1.apk",
+  "notes": "计划页排版修正：轴标签移到坐标区外、象限名精简、去掉多余标题、空态提示移到坐标图下方。"
 }
